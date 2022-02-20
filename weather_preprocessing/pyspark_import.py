@@ -1,10 +1,14 @@
+import datetime
+from itertools import product
+
 import findspark
+
 findspark.init()
 
 from pyspark.sql.functions import input_file_name
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, Window
 from pyspark.sql.types import *
-import os
+import pyspark.sql.functions as F
 
 
 def main():
