@@ -52,7 +52,6 @@ def main():
     fullPath = "datasets_mock/????/*.csv"
 
     df = spark.read.format("csv") \
-        #.option("header", False) \
         .option("header", True) \
         .option("sep", ",") \
         .schema(customSchema) \
