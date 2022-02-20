@@ -96,3 +96,26 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# STATION
+# DATE     			for later
+# TEMP     			not 9999.9
+# TEMP_ATTRIBUTES 	> 0
+# DEWP				not 9999.9
+# DEWP_ATTRIBUTES 	> 0
+# SLP				not 9999.9
+# SLP_ATTRIBUTES 		> 0
+# STP				not 9999.9
+# STP_ATTRIBUTES 		> 0
+# VISIB				not 999.9
+# VISIB_ATTRIBUTES	> 0
+# WDSP				not 999.9
+# WDSP_ATTRIBUTES		> 0
+# MXSPD				not 999.9
+# GUST				not 999.9
+# MAX				not 9999.9
+# MAX_ATTRIBUTES
+# MIN				not 9999.9
+# MIN_ATTRIBUTES
+# PRCP				not negative
+# PRCP_ATTRIBUTES	not "I"
