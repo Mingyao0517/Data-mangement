@@ -1,4 +1,5 @@
 import datetime
+import time
 from itertools import product
 
 import findspark
@@ -14,12 +15,13 @@ import pyspark.sql.functions as F
 def main():
     spark = SparkSession.builder.appName("weather_preprocessing").getOrCreate()
     sc = spark.sparkContext
+    start = time.time()
 
     session = SparkSession(sc)
 
     customSchema = StructType([
         StructField("STATION", StringType(), True),
-        StructField("DATE", StringType(), True),
+        StructField("DATE", DateType(), True),
         StructField("LATITUDE", StringType(), True),
         StructField("LONGITUDE", StringType(), True),
         StructField("ELEVATION", StringType(), True),
@@ -46,20 +48,27 @@ def main():
         StructField("PRCP_ATTRIBUTES", StringType(), True),
         StructField("SNDP", StringType(), True),
         StructField("FRSHTT", StringType(), True),
-        StructField("filename", StringType(), True),
     ])
 
-    fullPath = "datasets_mock/????/*.csv"
+    fullPath = "weather_preprocessing/datasets/????/*.csv"
 
     df = spark.read.format("csv") \
         .option("header", True) \
         .option("sep", ",") \
         .schema(customSchema) \
-        .load(fullPath) \
-        .withColumn("filename", input_file_name())
+        .load(fullPath)
+    print(f"Data reading took {time.time() - start:.2f}s")
+    start = time.time()
 
-    print(df.head(25))
+    df = clean_weather_data(df)
+    print(f"Data cleaning took {time.time() - start:.2f}s")
+    start = time.time()
 
+    # Write cleaned data to a file
+    print(f"Writing {df.count()} rows to file")
+    df.write.mode('overwrite').parquet('clean_data/weather.parquet')
+    print(f"Data writing took {time.time() - start:.2f}s")
+    return
     
     df_test = df.withColumn("DATE1",(F.to_date(F.col("DATE"),"yyyy-MM-dd")))
     #print(df_test.show(3))
@@ -93,29 +102,71 @@ def main():
         F.coalesce(df3.TEMP, df3.LAST_TEMP).alias("TEMP"))
     df4.show(3)
 
+    # TODO: clean dataset
+    # TODO: export cleaned data to a new file
+    # TODO: zip it
+
+def clean_weather_data(df):
+    '''
+    According to the following table, remove stations with out-of-range observations.
+    # STATION           any
+    # DATE     			any
+    # TEMP     			not 9999.9
+    # TEMP_ATTRIBUTES 	> 0
+    # DEWP				not 9999.9
+    # DEWP_ATTRIBUTES 	> 0
+    # SLP				not 9999.9
+    # SLP_ATTRIBUTES 		> 0
+    # STP				not 9999.9
+    # STP_ATTRIBUTES 		> 0
+    # VISIB				not 999.9
+    # VISIB_ATTRIBUTES	> 0
+    # WDSP				not 999.9
+    # WDSP_ATTRIBUTES	> 0
+    # MXSPD				not 999.9
+    # GUST				not 999.9
+    # MAX				not 9999.9
+    # MAX_ATTRIBUTES    any
+    # MIN				not 9999.9
+    # MIN_ATTRIBUTES    any
+    # PRCP				not negative
+    # PRCP_ATTRIBUTES	not "I"
+    '''
+    # Remove unnamed columns
+    df = df.drop(*["LATITUDE", "LONGITUDE", "ELEVATION", "NAME", "SNDP", "FRSHTT"])
+    # Find the maximum number of records if a station recorded every single day
+    first_date, last_date = df.agg(F.min(df.DATE),F.max(df.DATE)).head()
+    max_records = (last_date - first_date).days
+    print(f"Full dataset: {df.count()} rows")
+    print(f"Number of stations: {df.select('STATION').distinct().count()}")
+    print(f"Total number of days in range: {max_records}")
+    df = df.filter(
+        (df.TEMP  != "9999.9") &
+        (df.TEMP_ATTRIBUTES  != "0") &
+        (df.DEWP  != "9999.9") &
+        (df.DEWP_ATTRIBUTES  != "0") &
+        (df.SLP  != "9999.9") &
+        (df.SLP_ATTRIBUTES  != "0") &
+        (df.STP  != "9999.9") &
+        (df.STP_ATTRIBUTES  != "0") &
+        (df.VISIB  != "999.9") &
+        (df.VISIB_ATTRIBUTES  != "0") &
+        (df.WDSP  != "999.9") &
+        (df.WDSP_ATTRIBUTES  != "0") &
+        (df.MXSPD  != "999.9") &
+        (df.GUST  != "999.9") &
+        (df.MAX  != "9999.9") &
+        (df.MIN  != "9999.9") &
+        (df.PRCP_ATTRIBUTES  != "I")
+    )
+    print(f"After filtering: {df.count()} rows")
+    print(f"Number of stations: {df.select('STATION').distinct().count()}")
+    count_by_station = df.groupBy('STATION').count().collect()
+    # Keep only station data if it has at least 5/7=72% of the maximum points
+    threshold = max_records * 0.72
+    keep_set = {row['STATION'] for row in count_by_station if row['count'] >= threshold}
+    print(f"Keeping data for {len(keep_set)} stations")
+    return df.filter(df.STATION.isin(keep_set))
 
 if __name__ == "__main__":
     main()
-
-# STATION
-# DATE     			for later
-# TEMP     			not 9999.9
-# TEMP_ATTRIBUTES 	> 0
-# DEWP				not 9999.9
-# DEWP_ATTRIBUTES 	> 0
-# SLP				not 9999.9
-# SLP_ATTRIBUTES 		> 0
-# STP				not 9999.9
-# STP_ATTRIBUTES 		> 0
-# VISIB				not 999.9
-# VISIB_ATTRIBUTES	> 0
-# WDSP				not 999.9
-# WDSP_ATTRIBUTES		> 0
-# MXSPD				not 999.9
-# GUST				not 999.9
-# MAX				not 9999.9
-# MAX_ATTRIBUTES
-# MIN				not 9999.9
-# MIN_ATTRIBUTES
-# PRCP				not negative
-# PRCP_ATTRIBUTES	not "I"
