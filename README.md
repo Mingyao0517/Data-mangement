@@ -15,6 +15,7 @@ weather_preprocessing/datasets: folder with 2016, 2017, 2018, 2019, 2020 subfold
 
 ### Data cleaning
 `> python weather_preprocessing/pyspark_import.py`
+
 Example output:
 ```
 Data reading took 18.64s
@@ -31,7 +32,7 @@ Scaling row group sizes to 95.00% for 8 writers
 Data writing took 300.43s
 ```
 
-Confirm correctness:
+**Confirm correctness:**
 ```
 > python weather_preprocessing/part1.py
 Imported 247249 rows
