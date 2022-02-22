@@ -6,10 +6,10 @@ import findspark
 
 findspark.init()
 
-from pyspark.sql.functions import input_file_name
 from pyspark.sql import SparkSession, Window
 from pyspark.sql.types import *
 import pyspark.sql.functions as F
+import csv
 
 
 def main():
@@ -21,7 +21,7 @@ def main():
 
     customSchema = StructType([
         StructField("STATION", StringType(), True),
-        StructField("DATE", DateType(), True),
+        StructField("DATE", StringType(), True),
         StructField("LATITUDE", StringType(), True),
         StructField("LONGITUDE", StringType(), True),
         StructField("ELEVATION", StringType(), True),
@@ -69,22 +69,22 @@ def main():
     df.write.mode('overwrite').parquet('clean_data/weather.parquet')
     print(f"Data writing took {time.time() - start:.2f}s")
     return
-    
-    df_test = df.withColumn("DATE1",(F.to_date(F.col("DATE"),"yyyy-MM-dd")))
-    #print(df_test.show(3))
-    min_max_timestamps = df_test.agg(F.min(df_test.DATE1),F.max(df_test.DATE1)).head()
+
+    df_test = df.withColumn("DATE1", (F.to_date(F.col("DATE"), "yyyy-MM-dd")))
+    # print(df_test.show(3))
+    min_max_timestamps = df_test.agg(F.min(df_test.DATE1), F.max(df_test.DATE1)).head()
     first_date, last_date = [ts for ts in min_max_timestamps]
-    #print(min_max_timestamps)
-    #print(first_date,last_date)
+    # print(min_max_timestamps)
+    # print(first_date,last_date)
 
     station = [row.STATION for row in df_test.select("STATION").distinct().collect()]
     all_days_in_range = [first_date + datetime.timedelta(days=d)
-                     for d in range((last_date - first_date).days + 1)]
-    dates_by_station = spark.createDataFrame(product(station,all_days_in_range),
-                                             schema=("STATION","DATE2"))
+                         for d in range((last_date - first_date).days + 1)]
+    dates_by_station = spark.createDataFrame(product(station, all_days_in_range),
+                                             schema=("STATION", "DATE2"))
     df2 = (dates_by_station.join(df_test,
                                  (F.to_date(df_test.DATE) == dates_by_station.DATE2)
-                                & (dates_by_station.STATION == df_test.STATION),
+                                 & (dates_by_station.STATION == df_test.STATION),
                                  how="left")
            .drop(df_test.STATION)
            )
@@ -106,8 +106,9 @@ def main():
     # TODO: export cleaned data to a new file
     # TODO: zip it
 
+
 def clean_weather_data(df):
-    '''
+    """
     According to the following table, remove stations with out-of-range observations.
     # STATION           any
     # DATE     			any
@@ -131,42 +132,56 @@ def clean_weather_data(df):
     # MIN_ATTRIBUTES    any
     # PRCP				not negative
     # PRCP_ATTRIBUTES	not "I"
-    '''
+    """
     # Remove unnamed columns
     df = df.drop(*["LATITUDE", "LONGITUDE", "ELEVATION", "NAME", "SNDP", "FRSHTT"])
     # Find the maximum number of records if a station recorded every single day
-    first_date, last_date = df.agg(F.min(df.DATE),F.max(df.DATE)).head()
+    first_date, last_date = df.agg(F.min(df.DATE), F.max(df.DATE)).head()
     max_records = (last_date - first_date).days
     print(f"Full dataset: {df.count()} rows")
     print(f"Number of stations: {df.select('STATION').distinct().count()}")
     print(f"Total number of days in range: {max_records}")
     df = df.filter(
-        (df.TEMP  != "9999.9") &
-        (df.TEMP_ATTRIBUTES  != "0") &
-        (df.DEWP  != "9999.9") &
-        (df.DEWP_ATTRIBUTES  != "0") &
-        (df.SLP  != "9999.9") &
-        (df.SLP_ATTRIBUTES  != "0") &
-        (df.STP  != "9999.9") &
-        (df.STP_ATTRIBUTES  != "0") &
-        (df.VISIB  != "999.9") &
-        (df.VISIB_ATTRIBUTES  != "0") &
-        (df.WDSP  != "999.9") &
-        (df.WDSP_ATTRIBUTES  != "0") &
-        (df.MXSPD  != "999.9") &
-        (df.GUST  != "999.9") &
-        (df.MAX  != "9999.9") &
-        (df.MIN  != "9999.9") &
-        (df.PRCP_ATTRIBUTES  != "I")
+        (df.TEMP != "9999.9") &
+        (df.TEMP_ATTRIBUTES != "0") &
+        (df.DEWP != "9999.9") &
+        (df.DEWP_ATTRIBUTES != "0") &
+        (df.SLP != "9999.9") &
+        (df.SLP_ATTRIBUTES != "0") &
+        (df.STP != "9999.9") &
+        (df.STP_ATTRIBUTES != "0") &
+        (df.VISIB != "999.9") &
+        (df.VISIB_ATTRIBUTES != "0") &
+        (df.WDSP != "999.9") &
+        (df.WDSP_ATTRIBUTES != "0") &
+        (df.MXSPD != "999.9") &
+        (df.GUST != "999.9") &
+        (df.MAX != "9999.9") &
+        (df.MIN != "9999.9") &
+        (df.PRCP_ATTRIBUTES != "I")
     )
     print(f"After filtering: {df.count()} rows")
     print(f"Number of stations: {df.select('STATION').distinct().count()}")
     count_by_station = df.groupBy('STATION').count().collect()
-    # Keep only station data if it has at least 5/7=72% of the maximum points
-    threshold = max_records * 0.72
-    keep_set = {row['STATION'] for row in count_by_station if row['count'] >= threshold}
+
+    # TODO: Make this faster. (possible solution: use DateType, rangeBetween, and remove dates not in range | join on)
+    # Import stock dates, convert to list
+    with open("date.csv", newline='') as f:
+        reader = csv.reader(f)
+        dates = list(reader)
+        dates = dates[1:]
+        # from "MM/dd/yyyy" to "yyyy-MM-dd" in string format
+        stock_dates = [f"{x[6:10]}-{x[0:2]}-{x[3:5]}" for x, y in dates]
+
+    # Keep only station data where the dates are in date.csv
+    df_temp = df.filter(df.DATE.isin(stock_dates))
+    print("Rows after date filtering:", df_temp.count())
+
+    keep_set = {row['STATION'] for row in count_by_station if row['count'] >= len(stock_dates)}
+
     print(f"Keeping data for {len(keep_set)} stations")
     return df.filter(df.STATION.isin(keep_set))
+
 
 if __name__ == "__main__":
     main()

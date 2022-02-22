@@ -32,6 +32,20 @@ Scaling row group sizes to 95.00% for 8 writers
 Data writing took 300.43s
 ```
 
+Output updated for first dates filter:
+```
+Data reading took 114.06s
+Full dataset: 20570861 rows
+Number of stations: 13130
+After filtering: 1917185 rows
+Number of stations: 4643
+Rows after date filtering 1377368
+Keeping data for 190 stations
+Data cleaning took 678.04s
+Writing 269510 rows to file
+Data writing took 233.96s
+```
+
 **Confirm correctness:**
 ```
 > python weather_preprocessing/part1.py
