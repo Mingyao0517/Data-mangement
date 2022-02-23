@@ -174,8 +174,8 @@ def clean_weather_data(df):
         stock_dates = [f"{x[6:10]}-{x[0:2]}-{x[3:5]}" for x, y in dates]
 
     # Keep only station data where the dates are in date.csv
-    df_temp = df.filter(df.DATE.isin(stock_dates))
-    print("Rows after date filtering:", df_temp.count())
+    df = df.filter(df.DATE.isin(stock_dates))
+    print("Rows after date filtering:", df.count())
 
     keep_set = {row['STATION'] for row in count_by_station if row['count'] >= len(stock_dates)}
 
