@@ -70,42 +70,6 @@ def main():
     print(f"Data writing took {time.time() - start:.2f}s")
     return
 
-    df_test = df.withColumn("DATE1", (F.to_date(F.col("DATE"), "yyyy-MM-dd")))
-    # print(df_test.show(3))
-    min_max_timestamps = df_test.agg(F.min(df_test.DATE1), F.max(df_test.DATE1)).head()
-    first_date, last_date = [ts for ts in min_max_timestamps]
-    # print(min_max_timestamps)
-    # print(first_date,last_date)
-
-    station = [row.STATION for row in df_test.select("STATION").distinct().collect()]
-    all_days_in_range = [first_date + datetime.timedelta(days=d)
-                         for d in range((last_date - first_date).days + 1)]
-    dates_by_station = spark.createDataFrame(product(station, all_days_in_range),
-                                             schema=("STATION", "DATE2"))
-    df2 = (dates_by_station.join(df_test,
-                                 (F.to_date(df_test.DATE) == dates_by_station.DATE2)
-                                 & (dates_by_station.STATION == df_test.STATION),
-                                 how="left")
-           .drop(df_test.STATION)
-           )
-    wind = (Window
-            .partitionBy("STATION")
-            .rangeBetween(Window.unboundedPreceding, -1)
-            .orderBy(F.unix_timestamp("DATE2"))
-            )
-    df3 = df2.withColumn("LAST_TEMP",
-                         F.last("TEMP", ignorenulls=True).over(wind))
-    print(df3.show(3))
-    df4 = df3.select(
-        df3.STATION,
-        F.coalesce(df3.DATE1, F.to_timestamp(df3.DATE2)).alias("DATE1"),
-        F.coalesce(df3.TEMP, df3.LAST_TEMP).alias("TEMP"))
-    df4.show(3)
-
-    # TODO: clean dataset
-    # TODO: export cleaned data to a new file
-    # TODO: zip it
-
 
 def clean_weather_data(df):
     """
